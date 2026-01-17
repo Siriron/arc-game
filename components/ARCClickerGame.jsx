@@ -6,7 +6,7 @@ const CONTRACT_ADDRESS = '0x2Ee409Ef8DB594adE165dFaaE1ADD362dbEdAb31';
 const ARC_TESTNET_CONFIG = {
   chainId: '0x4cf0ea',
   chainName: 'Arc Network Testnet',
-  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: ['https://rpc.testnet.arc.network'],
   blockExplorerUrls: ['https://testnet.arcscan.app']
 };
@@ -345,4 +345,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-                  }
+                }
