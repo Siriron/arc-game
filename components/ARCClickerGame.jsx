@@ -70,7 +70,10 @@ export default function ARCClickerGame() {
     if (!window.ethereum) return;
     
     try {
-      const data = '0x5c60f693' + address.slice(2).padStart(64, '0');
+      // getScore(address) function selector
+      const functionSelector = '0x1e7d7f7f';
+      const addressParam = address.slice(2).toLowerCase().padStart(64, '0');
+      const data = functionSelector + addressParam;
       
       const result = await window.ethereum.request({
         method: 'eth_call',
@@ -80,10 +83,15 @@ export default function ARCClickerGame() {
         }, 'latest']
       });
 
-      const scoreValue = parseInt(result, 16);
-      setOnChainScore(scoreValue);
+      if (result && result !== '0x') {
+        const scoreValue = parseInt(result, 16);
+        setOnChainScore(scoreValue);
+      } else {
+        setOnChainScore(0);
+      }
     } catch (err) {
       console.error('Failed to fetch on-chain score:', err);
+      setOnChainScore(0);
     }
   };
 
@@ -110,9 +118,13 @@ export default function ARCClickerGame() {
         return;
       }
 
+      // recordScore(uint256) function selector - keccak256("recordScore(uint256)")
       const functionSelector = '0x6b8ff574';
       const scoreHex = score.toString(16).padStart(64, '0');
       const data = functionSelector + scoreHex;
+
+      console.log('Recording score:', score);
+      console.log('Transaction data:', data);
 
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
@@ -120,7 +132,6 @@ export default function ARCClickerGame() {
           from: wallet,
           to: CONTRACT_ADDRESS,
           data: data,
-          gas: '0x30D40',
         }],
       });
 
@@ -314,4 +325,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-        }
+            }
