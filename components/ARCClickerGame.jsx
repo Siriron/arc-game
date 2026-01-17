@@ -117,20 +117,37 @@ export default function ARCClickerGame() {
       return;
     }
 
+    if (!window.ethereum) {
+      alert('Wallet not found!');
+      return;
+    }
+
     setIsRecording(true);
     try {
-      const provider = new window.ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const contract = new window.ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      // Manual ABI encoding for recordScore(uint256)
+      const functionSelector = '0x6b8ff574'; // keccak256("recordScore(uint256)") first 4 bytes
+      const scoreHex = score.toString(16).padStart(64, '0');
+      const data = functionSelector + scoreHex;
+
+      // Send transaction directly via MetaMask
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: wallet,
+          to: CONTRACT_ADDRESS,
+          data: data,
+          gas: '0x186A0', // 100000 in hex
+        }],
+      });
+
+      alert('Transaction sent! 🎉 Hash: ' + txHash.slice(0, 10) + '...');
       
-      const tx = await contract.recordScore(score);
-      await tx.wait();
+      // Wait a bit then refresh on-chain score
+      setTimeout(() => fetchOnChainScore(wallet), 3000);
       
-      alert('Score recorded on ARC testnet! 🎉');
-      await fetchOnChainScore(wallet);
     } catch (err) {
       console.error('Failed to record score:', err);
-      alert('Failed to record score on-chain');
+      alert('Transaction failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsRecording(false);
     }
@@ -313,4 +330,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-}
+  }
