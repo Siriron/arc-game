@@ -3,7 +3,7 @@ import { Wallet, Trophy, Zap, Star } from 'lucide-react';
 
 const CONTRACT_ADDRESS = '0x2Ee409Ef8DB594adE165dFaaE1ADD362dbEdAb31';
 const ARC_TESTNET_CONFIG = {
-  chainId: '0x128ca',
+  chainId: '0x128ca', // 75978 in hex
   chainName: 'ARC Testnet',
   nativeCurrency: { name: 'ARC', symbol: 'ARC', decimals: 18 },
   rpcUrls: ['https://rpc.arctest.circle.com'],
@@ -46,6 +46,7 @@ export default function ARCClickerGame() {
   const [particles, setParticles] = useState([]);
   const [ripples, setRipples] = useState([]);
 
+  // Auto-clicker effect
   useEffect(() => {
     if (autoClickers > 0) {
       const interval = setInterval(() => {
@@ -55,6 +56,7 @@ export default function ARCClickerGame() {
     }
   }, [autoClickers]);
 
+  // Particle cleanup
   useEffect(() => {
     const cleanup = setInterval(() => {
       setParticles(p => p.filter(particle => Date.now() - particle.id < 1000));
@@ -74,6 +76,7 @@ export default function ARCClickerGame() {
         method: 'eth_requestAccounts' 
       });
 
+      // Check if already on ARC testnet
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
       
       if (chainId !== ARC_TESTNET_CONFIG.chainId) {
@@ -160,6 +163,7 @@ export default function ARCClickerGame() {
 
     setScore(s => s + clickPower);
     
+    // Add particle
     setParticles(p => [...p, { 
       id: Date.now() + Math.random(), 
       x, 
@@ -167,6 +171,7 @@ export default function ARCClickerGame() {
       value: clickPower 
     }]);
 
+    // Add ripple
     setRipples(r => [...r, { id: Date.now() + Math.random(), x, y }]);
   };
 
@@ -180,6 +185,7 @@ export default function ARCClickerGame() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative">
+      {/* Animated background stars */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(50)].map((_, i) => (
           <Star 
@@ -196,6 +202,7 @@ export default function ARCClickerGame() {
       </div>
 
       <div className="max-w-md w-full relative z-10">
+        {/* Header */}
         <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-t-3xl p-6 shadow-2xl">
           <h1 className="text-4xl font-bold text-white text-center mb-4 flex items-center justify-center gap-2">
             <Zap className="text-yellow-300" />
@@ -225,7 +232,9 @@ export default function ARCClickerGame() {
           )}
         </div>
 
+        {/* Game area */}
         <div className="bg-white rounded-b-3xl shadow-2xl p-8">
+          {/* Score display */}
           <div className="text-center mb-8">
             <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 animate-pulse">
               {score.toLocaleString()}
@@ -233,6 +242,7 @@ export default function ARCClickerGame() {
             <p className="text-gray-600 text-sm">Total Clicks</p>
           </div>
 
+          {/* Click button */}
           <div className="relative mb-8">
             <button
               onClick={handleClick}
@@ -244,6 +254,7 @@ export default function ARCClickerGame() {
               <div className="absolute inset-0 bg-white opacity-20 animate-pulse rounded-full"></div>
               <Zap className="absolute inset-0 m-auto text-white" size={80} />
               
+              {/* Particles */}
               {particles.map(particle => (
                 <div
                   key={particle.id}
@@ -258,6 +269,7 @@ export default function ARCClickerGame() {
                 </div>
               ))}
 
+              {/* Ripples */}
               {ripples.map(ripple => (
                 <div
                   key={ripple.id}
@@ -273,6 +285,7 @@ export default function ARCClickerGame() {
             </button>
           </div>
 
+          {/* Stats */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 text-center">
               <div className="text-2xl font-bold text-purple-700">{clickPower}</div>
@@ -284,6 +297,7 @@ export default function ARCClickerGame() {
             </div>
           </div>
 
+          {/* Upgrades */}
           <div className="space-y-3 mb-6">
             <button
               onClick={() => buyUpgrade(10, 'power')}
@@ -301,6 +315,7 @@ export default function ARCClickerGame() {
             </button>
           </div>
 
+          {/* Record score button */}
           {wallet && (
             <button
               onClick={recordScoreOnChain}
@@ -330,4 +345,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-  }
+}
