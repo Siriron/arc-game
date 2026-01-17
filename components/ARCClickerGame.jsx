@@ -4,7 +4,7 @@ import { Wallet, Trophy, Zap, Star } from 'lucide-react';
 const CONTRACT_ADDRESS = '0x2Ee409Ef8DB594adE165dFaaE1ADD362dbEdAb31';
 
 const ARC_TESTNET_CONFIG = {
-  chainId: '0x4cf0ea',
+  chainId: '0x4cef52',
   chainName: 'Arc Network Testnet',
   nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
   rpcUrls: ['https://rpc.testnet.arc.network'],
@@ -46,7 +46,6 @@ export default function ARCClickerGame() {
     }
 
     if (isConnecting) {
-      alert('Already connecting... Please check your wallet.');
       return;
     }
 
@@ -56,37 +55,12 @@ export default function ARCClickerGame() {
         method: 'eth_requestAccounts' 
       });
 
-      const currentChainId = await window.ethereum.request({ 
-        method: 'eth_chainId' 
-      });
-
-      console.log('Current Chain ID:', currentChainId);
-      console.log('Expected Chain ID:', ARC_TESTNET_CONFIG.chainId);
-
-      if (currentChainId.toLowerCase() !== ARC_TESTNET_CONFIG.chainId.toLowerCase()) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: ARC_TESTNET_CONFIG.chainId }],
-          });
-        } catch (switchError) {
-          if (switchError.code === 4902) {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [ARC_TESTNET_CONFIG],
-            });
-          } else {
-            throw switchError;
-          }
-        }
-      }
-
       setWallet(accounts[0]);
       await fetchOnChainScore(accounts[0]);
       
     } catch (err) {
       console.error('Wallet connection failed:', err);
-      alert('Failed to connect wallet: ' + err.message);
+      alert('Failed to connect wallet');
     } finally {
       setIsConnecting(false);
     }
@@ -139,11 +113,6 @@ export default function ARCClickerGame() {
       const functionSelector = '0x6b8ff574';
       const scoreHex = score.toString(16).padStart(64, '0');
       const data = functionSelector + scoreHex;
-
-      console.log('Sending transaction...');
-      console.log('From:', wallet);
-      console.log('To:', CONTRACT_ADDRESS);
-      console.log('Data:', data);
 
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
@@ -345,4 +314,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-                }
+        }
