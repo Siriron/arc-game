@@ -1,40 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wallet, Trophy, Zap, Star } from 'lucide-react';
 
 const CONTRACT_ADDRESS = '0x2Ee409Ef8DB594adE165dFaaE1ADD362dbEdAb31';
-const ARC_TESTNET_CONFIG = {
-  chainId: '0x128ca', // 75978 in hex
-  chainName: 'ARC Testnet',
-  nativeCurrency: { name: 'ARC', symbol: 'ARC', decimals: 18 },
-  rpcUrls: ['https://rpc.arctest.circle.com'],
-  blockExplorerUrls: ['https://arcscan.circle.com']
-};
 
-const CONTRACT_ABI = [
-  {
-    "anonymous": false,
-    "inputs": [
-      {"indexed": true, "internalType": "address", "name": "player", "type": "address"},
-      {"indexed": false, "internalType": "uint256", "name": "score", "type": "uint256"}
-    ],
-    "name": "ScoreRecorded",
-    "type": "event"
-  },
-  {
-    "inputs": [{"internalType": "address", "name": "player", "type": "address"}],
-    "name": "getScore",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [{"internalType": "uint256", "name": "score", "type": "uint256"}],
-    "name": "recordScore",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-];
+const ARC_TESTNET_CONFIG = {
+  chainId: '0x4cf0ea',
+  chainName: 'Arc Network Testnet',
+  nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+  rpcUrls: ['https://rpc.testnet.arc.network'],
+  blockExplorerUrls: ['https://testnet.arcscan.app']
+};
 
 export default function ARCClickerGame() {
   const [score, setScore] = useState(0);
@@ -46,7 +21,6 @@ export default function ARCClickerGame() {
   const [particles, setParticles] = useState([]);
   const [ripples, setRipples] = useState([]);
 
-  // Auto-clicker effect
   useEffect(() => {
     if (autoClickers > 0) {
       const interval = setInterval(() => {
@@ -56,7 +30,6 @@ export default function ARCClickerGame() {
     }
   }, [autoClickers]);
 
-  // Particle cleanup
   useEffect(() => {
     const cleanup = setInterval(() => {
       setParticles(p => p.filter(particle => Date.now() - particle.id < 1000));
@@ -76,10 +49,14 @@ export default function ARCClickerGame() {
         method: 'eth_requestAccounts' 
       });
 
-      // Check if already on ARC testnet
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      
-      if (chainId !== ARC_TESTNET_CONFIG.chainId) {
+      const currentChainId = await window.ethereum.request({ 
+        method: 'eth_chainId' 
+      });
+
+      console.log('Current Chain ID:', currentChainId);
+      console.log('Expected Chain ID:', ARC_TESTNET_CONFIG.chainId);
+
+      if (currentChainId.toLowerCase() !== ARC_TESTNET_CONFIG.chainId.toLowerCase()) {
         try {
           await window.ethereum.request({
             method: 'wallet_switchEthereumChain',
@@ -91,24 +68,37 @@ export default function ARCClickerGame() {
               method: 'wallet_addEthereumChain',
               params: [ARC_TESTNET_CONFIG],
             });
+          } else {
+            throw switchError;
           }
         }
       }
 
       setWallet(accounts[0]);
       await fetchOnChainScore(accounts[0]);
+      
     } catch (err) {
       console.error('Wallet connection failed:', err);
-      alert('Failed to connect wallet');
+      alert('Failed to connect wallet: ' + err.message);
     }
   };
 
   const fetchOnChainScore = async (address) => {
+    if (!window.ethereum) return;
+    
     try {
-      const provider = new window.ethers.providers.Web3Provider(window.ethereum);
-      const contract = new window.ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-      const score = await contract.getScore(address);
-      setOnChainScore(score.toNumber());
+      const data = '0x5c60f693' + address.slice(2).padStart(64, '0');
+      
+      const result = await window.ethereum.request({
+        method: 'eth_call',
+        params: [{
+          to: CONTRACT_ADDRESS,
+          data: data
+        }, 'latest']
+      });
+
+      const scoreValue = parseInt(result, 16);
+      setOnChainScore(scoreValue);
     } catch (err) {
       console.error('Failed to fetch on-chain score:', err);
     }
@@ -127,29 +117,41 @@ export default function ARCClickerGame() {
 
     setIsRecording(true);
     try {
-      // Manual ABI encoding for recordScore(uint256)
-      const functionSelector = '0x6b8ff574'; // keccak256("recordScore(uint256)") first 4 bytes
+      const currentChainId = await window.ethereum.request({ 
+        method: 'eth_chainId' 
+      });
+
+      if (currentChainId.toLowerCase() !== ARC_TESTNET_CONFIG.chainId.toLowerCase()) {
+        alert('Please switch to ARC Testnet network first!');
+        setIsRecording(false);
+        return;
+      }
+
+      const functionSelector = '0x6b8ff574';
       const scoreHex = score.toString(16).padStart(64, '0');
       const data = functionSelector + scoreHex;
 
-      // Send transaction directly via MetaMask
+      console.log('Sending transaction...');
+      console.log('From:', wallet);
+      console.log('To:', CONTRACT_ADDRESS);
+      console.log('Data:', data);
+
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
         params: [{
           from: wallet,
           to: CONTRACT_ADDRESS,
           data: data,
-          gas: '0x186A0', // 100000 in hex
+          gas: '0x30D40',
         }],
       });
 
-      alert('Transaction sent! 🎉 Hash: ' + txHash.slice(0, 10) + '...');
+      alert('Transaction sent! 🎉\nHash: ' + txHash);
       
-      // Wait a bit then refresh on-chain score
-      setTimeout(() => fetchOnChainScore(wallet), 3000);
+      setTimeout(() => fetchOnChainScore(wallet), 5000);
       
     } catch (err) {
-      console.error('Failed to record score:', err);
+      console.error('Transaction failed:', err);
       alert('Transaction failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsRecording(false);
@@ -163,7 +165,6 @@ export default function ARCClickerGame() {
 
     setScore(s => s + clickPower);
     
-    // Add particle
     setParticles(p => [...p, { 
       id: Date.now() + Math.random(), 
       x, 
@@ -171,7 +172,6 @@ export default function ARCClickerGame() {
       value: clickPower 
     }]);
 
-    // Add ripple
     setRipples(r => [...r, { id: Date.now() + Math.random(), x, y }]);
   };
 
@@ -185,7 +185,6 @@ export default function ARCClickerGame() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Animated background stars */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {[...Array(50)].map((_, i) => (
           <Star 
@@ -202,7 +201,6 @@ export default function ARCClickerGame() {
       </div>
 
       <div className="max-w-md w-full relative z-10">
-        {/* Header */}
         <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-t-3xl p-6 shadow-2xl">
           <h1 className="text-4xl font-bold text-white text-center mb-4 flex items-center justify-center gap-2">
             <Zap className="text-yellow-300" />
@@ -232,9 +230,7 @@ export default function ARCClickerGame() {
           )}
         </div>
 
-        {/* Game area */}
         <div className="bg-white rounded-b-3xl shadow-2xl p-8">
-          {/* Score display */}
           <div className="text-center mb-8">
             <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 animate-pulse">
               {score.toLocaleString()}
@@ -242,7 +238,6 @@ export default function ARCClickerGame() {
             <p className="text-gray-600 text-sm">Total Clicks</p>
           </div>
 
-          {/* Click button */}
           <div className="relative mb-8">
             <button
               onClick={handleClick}
@@ -254,7 +249,6 @@ export default function ARCClickerGame() {
               <div className="absolute inset-0 bg-white opacity-20 animate-pulse rounded-full"></div>
               <Zap className="absolute inset-0 m-auto text-white" size={80} />
               
-              {/* Particles */}
               {particles.map(particle => (
                 <div
                   key={particle.id}
@@ -269,7 +263,6 @@ export default function ARCClickerGame() {
                 </div>
               ))}
 
-              {/* Ripples */}
               {ripples.map(ripple => (
                 <div
                   key={ripple.id}
@@ -285,7 +278,6 @@ export default function ARCClickerGame() {
             </button>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 text-center">
               <div className="text-2xl font-bold text-purple-700">{clickPower}</div>
@@ -297,7 +289,6 @@ export default function ARCClickerGame() {
             </div>
           </div>
 
-          {/* Upgrades */}
           <div className="space-y-3 mb-6">
             <button
               onClick={() => buyUpgrade(10, 'power')}
@@ -315,7 +306,6 @@ export default function ARCClickerGame() {
             </button>
           </div>
 
-          {/* Record score button */}
           {wallet && (
             <button
               onClick={recordScoreOnChain}
@@ -345,4 +335,3 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-}
