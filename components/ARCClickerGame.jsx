@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wallet, Trophy, Zap, Star } from 'lucide-react';
+import { Wallet, Trophy, Zap, Star, Timer, Play } from 'lucide-react';
 
 const CONTRACT_ADDRESS = '0x2Ee409Ef8DB594adE165dFaaE1ADD362dbEdAb31';
 
@@ -21,15 +21,35 @@ export default function ARCClickerGame() {
   const [particles, setParticles] = useState([]);
   const [ripples, setRipples] = useState([]);
   const [isConnecting, setIsConnecting] = useState(false);
+  
+  // Timer state
+  const [gameMode, setGameMode] = useState('endless'); // 'endless' or 'timed'
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timedScore, setTimedScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
 
   useEffect(() => {
-    if (autoClickers > 0) {
+    if (autoClickers > 0 && gameMode === 'endless') {
       const interval = setInterval(() => {
         setScore(s => s + autoClickers);
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [autoClickers]);
+  }, [autoClickers, gameMode]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (isPlaying && timeLeft > 0) {
+      const timer = setTimeout(() => {
+        setTimeLeft(t => t - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (isPlaying && timeLeft === 0) {
+      setIsPlaying(false);
+      setGameOver(true);
+    }
+  }, [isPlaying, timeLeft]);
 
   useEffect(() => {
     const cleanup = setInterval(() => {
@@ -70,8 +90,7 @@ export default function ARCClickerGame() {
     if (!window.ethereum) return;
     
     try {
-      // getScore(address) function selector
-      const functionSelector = '0x1e7d7f7f';
+      const functionSelector = '0x4d7875d0';
       const addressParam = address.slice(2).toLowerCase().padStart(64, '0');
       const data = functionSelector + addressParam;
       
@@ -95,7 +114,7 @@ export default function ARCClickerGame() {
     }
   };
 
-  const recordScoreOnChain = async () => {
+  const recordScoreOnChain = async (scoreToRecord) => {
     if (!wallet) {
       alert('Please connect your wallet first!');
       return;
@@ -118,12 +137,11 @@ export default function ARCClickerGame() {
         return;
       }
 
-      // recordScore(uint256) function selector - keccak256("recordScore(uint256)")
-      const functionSelector = '0x6b8ff574';
-      const scoreHex = score.toString(16).padStart(64, '0');
+      const functionSelector = '0xefedd7d1';
+      const scoreHex = scoreToRecord.toString(16).padStart(64, '0');
       const data = functionSelector + scoreHex;
 
-      console.log('Recording score:', score);
+      console.log('Recording score:', scoreToRecord);
       console.log('Transaction data:', data);
 
       const txHash = await window.ethereum.request({
@@ -135,7 +153,7 @@ export default function ARCClickerGame() {
         }],
       });
 
-      alert('Transaction sent! 🎉\nHash: ' + txHash);
+      alert('Score recorded on-chain! 🎉\nHash: ' + txHash);
       
       setTimeout(() => fetchOnChainScore(wallet), 5000);
       
@@ -152,7 +170,11 @@ export default function ARCClickerGame() {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    setScore(s => s + clickPower);
+    if (gameMode === 'endless') {
+      setScore(s => s + clickPower);
+    } else if (isPlaying) {
+      setTimedScore(s => s + clickPower);
+    }
     
     setParticles(p => [...p, { 
       id: Date.now() + Math.random(), 
@@ -170,6 +192,20 @@ export default function ARCClickerGame() {
       if (type === 'power') setClickPower(p => p + 1);
       else setAutoClickers(a => a + 1);
     }
+  };
+
+  const startTimedGame = () => {
+    setTimedScore(0);
+    setTimeLeft(15);
+    setIsPlaying(true);
+    setGameOver(false);
+  };
+
+  const resetTimedGame = () => {
+    setTimedScore(0);
+    setTimeLeft(15);
+    setIsPlaying(false);
+    setGameOver(false);
   };
 
   return (
@@ -213,7 +249,7 @@ export default function ARCClickerGame() {
               {onChainScore !== null && (
                 <p className="text-yellow-300 text-xs flex items-center justify-center gap-1">
                   <Trophy size={14} />
-                  On-chain: {onChainScore}
+                  Best on-chain: {onChainScore}
                 </p>
               )}
             </div>
@@ -221,17 +257,97 @@ export default function ARCClickerGame() {
         </div>
 
         <div className="bg-white rounded-b-3xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 animate-pulse">
-              {score.toLocaleString()}
-            </div>
-            <p className="text-gray-600 text-sm">Total Clicks</p>
+          {/* Game Mode Selector */}
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setGameMode('endless')}
+              className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all ${
+                gameMode === 'endless' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Endless Mode
+            </button>
+            <button
+              onClick={() => setGameMode('timed')}
+              className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all ${
+                gameMode === 'timed' 
+                  ? 'bg-purple-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              15s Challenge
+            </button>
           </div>
 
+          {/* Score display */}
+          {gameMode === 'endless' ? (
+            <div className="text-center mb-8">
+              <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2 animate-pulse">
+                {score.toLocaleString()}
+              </div>
+              <p className="text-gray-600 text-sm">Total Clicks</p>
+            </div>
+          ) : (
+            <div className="text-center mb-8">
+              {!isPlaying && !gameOver && (
+                <button
+                  onClick={startTimedGame}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 px-8 rounded-xl hover:brightness-110 transition-all transform hover:scale-105 shadow-lg flex items-center justify-center gap-2 mx-auto"
+                >
+                  <Play size={24} />
+                  Start 15s Challenge
+                </button>
+              )}
+              
+              {isPlaying && (
+                <>
+                  <div className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+                    {timedScore.toLocaleString()}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 text-2xl font-bold text-orange-600">
+                    <Timer size={24} />
+                    {timeLeft}s
+                  </div>
+                </>
+              )}
+
+              {gameOver && (
+                <div>
+                  <div className="text-5xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+                    {timedScore.toLocaleString()}
+                  </div>
+                  <p className="text-gray-600 text-lg mb-4">Final Score!</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={resetTimedGame}
+                      className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all"
+                    >
+                      Play Again
+                    </button>
+                    {wallet && (
+                      <button
+                        onClick={() => recordScoreOnChain(timedScore)}
+                        disabled={isRecording}
+                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <Trophy size={18} />
+                        {isRecording ? 'Saving...' : 'Save Score'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Click button */}
           <div className="relative mb-8">
             <button
               onClick={handleClick}
-              className="w-full aspect-square rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 shadow-2xl transform transition-all active:scale-95 hover:shadow-3xl hover:brightness-110 relative overflow-hidden"
+              disabled={gameMode === 'timed' && !isPlaying}
+              className="w-full aspect-square rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-indigo-600 shadow-2xl transform transition-all active:scale-95 hover:shadow-3xl hover:brightness-110 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ 
                 boxShadow: '0 20px 60px rgba(168, 85, 247, 0.4)',
               }}
@@ -268,43 +384,50 @@ export default function ARCClickerGame() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-purple-700">{clickPower}</div>
-              <div className="text-xs text-gray-600">Click Power</div>
-            </div>
-            <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-blue-700">{autoClickers}</div>
-              <div className="text-xs text-gray-600">Auto/sec</div>
-            </div>
-          </div>
+          {/* Stats - only in endless mode */}
+          {gameMode === 'endless' && (
+            <>
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-700">{clickPower}</div>
+                  <div className="text-xs text-gray-600">Click Power</div>
+                </div>
+                <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-xl p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-700">{autoClickers}</div>
+                  <div className="text-xs text-gray-600">Auto/sec</div>
+                </div>
+              </div>
 
-          <div className="space-y-3 mb-6">
-            <button
-              onClick={() => buyUpgrade(10, 'power')}
-              disabled={score < 10}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all transform hover:scale-105 shadow-lg"
-            >
-              +1 Click Power (Cost: 10)
-            </button>
-            <button
-              onClick={() => buyUpgrade(50, 'auto')}
-              disabled={score < 50}
-              className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all transform hover:scale-105 shadow-lg"
-            >
-              +1 Auto Clicker (Cost: 50)
-            </button>
-          </div>
+              {/* Upgrades */}
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => buyUpgrade(10, 'power')}
+                  disabled={score < 10}
+                  className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all transform hover:scale-105 shadow-lg"
+                >
+                  +1 Click Power (Cost: 10)
+                </button>
+                <button
+                  onClick={() => buyUpgrade(50, 'auto')}
+                  disabled={score < 50}
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 transition-all transform hover:scale-105 shadow-lg"
+                >
+                  +1 Auto Clicker (Cost: 50)
+                </button>
+              </div>
 
-          {wallet && (
-            <button
-              onClick={recordScoreOnChain}
-              disabled={isRecording}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 px-6 rounded-xl hover:brightness-110 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
-            >
-              <Trophy size={20} />
-              {isRecording ? 'Recording...' : 'Record Score On-Chain'}
-            </button>
+              {/* Record score button - endless mode */}
+              {wallet && (
+                <button
+                  onClick={() => recordScoreOnChain(score)}
+                  disabled={isRecording}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-4 px-6 rounded-xl hover:brightness-110 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Trophy size={20} />
+                  {isRecording ? 'Recording...' : 'Record Score On-Chain'}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -325,4 +448,4 @@ export default function ARCClickerGame() {
       `}</style>
     </div>
   );
-            }
+      }
